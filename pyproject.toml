@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "ptnn"
+version = "0.1.0"
+description = ""
+authors = ["Nicholas Lai Jin Yung <nicklai88@live.com>"]
+readme = "README.md"
+
+[tool.poetry.scripts]
+trans = "ptnn.transformer:start"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+torch = "^1.13.0"
+torchvision = "^0.14.0"
+torchaudio = "^0.13.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

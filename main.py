@@ -25,7 +25,7 @@ if not args.disable_cuda and torch.cuda.is_available():
 else:
     args.device = torch.device('cpu')
 
-env = gym.make("CartPole-v1", render_mode="rgb_array")
+env = gym.make("CartPole-v1", render_mode="human")
 env = Wrapper(env)
 env.reset()
 
@@ -40,7 +40,7 @@ if is_ipython:
 # EPS_DECAY controls the rate of exponential decay of epsilon, higher means a slower decay
 # TAU is the update rate of the target network
 # LR is the learning rate of the ``AdamW`` optimizer
-BATCH_SIZE = 1
+BATCH_SIZE = 128
 GAMMA = 0.99
 EPS_START = 0.9
 EPS_END = 0.05
@@ -70,9 +70,9 @@ class ReplayMemory(object):
 
 
 if __name__ == '__main__':
-    memory = ReplayMemory(100)
-    policy_net = Model(EMBED_SIZE, HEADS, NUM_CLASSES)
-    target_net = Model(EMBED_SIZE, HEADS, NUM_CLASSES)
+    policy_net = Model(EMBED_SIZE, HEADS, NUM_CLASSES).to(args.device)
+    policy_net.load_state_dict(torch.load('model.pth'))
+    target_net = Model(EMBED_SIZE, HEADS, NUM_CLASSES).to(args.device)
     target_net.load_state_dict(policy_net.state_dict())
 
     optimizer = optim.AdamW(policy_net.parameters(), lr=LR, amsgrad=True)
@@ -86,7 +86,7 @@ if __name__ == '__main__':
         steps_done += 1
         if sample > eps_threshold:
             with torch.no_grad():
-                return policy_net(state).max(1)[1]
+                return policy_net(state.to('cuda')).max(1)[1]
         else:
             return torch.tensor([env.action_space.sample()], dtype=torch.long)
 
@@ -96,14 +96,16 @@ if __name__ == '__main__':
         transitions = memory.sample(BATCH_SIZE)
         batch = Transition(*zip(*transitions))
 
-        non_final_next_states = [s for s in batch.next_state if s is not None]
         for i in range(BATCH_SIZE):
-            state_action_values = policy_net(batch.state[i]).gather(1, batch.action[i].unsqueeze(1))
+            if batch.next_state[i] is None:
+                continue
+
+            state_action_values = policy_net(batch.state[i].to('cuda')).gather(1, batch.action[i].to('cuda').unsqueeze(1))
 
             with torch.no_grad():
-                next_state_values = target_net(non_final_next_states[i]).max(1)[0]
+                next_state_values = target_net(batch.next_state[i].to('cuda')).max(1)[0]
 
-            expected_state_action_values = (next_state_values * GAMMA) + batch.reward[i]
+            expected_state_action_values = (next_state_values * GAMMA) + batch.reward[i].to('cuda')
             criterion = nn.SmoothL1Loss()
             loss = criterion(state_action_values, expected_state_action_values.unsqueeze(1))
 
@@ -140,7 +142,7 @@ if __name__ == '__main__':
             else:
                 display.display(plt.gcf())
 
-    for _ in range(600):
+    for _ in range(30):
         state, _ = env.reset()
         for t in count():
             action = select_action(state)
@@ -156,23 +158,23 @@ if __name__ == '__main__':
             memory.push(state, action, next_state, reward)
             state = next_state
 
-            # Perform one step of the optimization (on the policy network)
-            with torch.autograd.set_detect_anomaly(True):
-                optimize_model()
+            optimize_model()
 
             # Soft update of the target network's weights
             # θ′ ← τ θ + (1 −τ )θ′
             target_net_state_dict = target_net.state_dict()
             policy_net_state_dict = policy_net.state_dict()
             for key in policy_net_state_dict:
-                target_net_state_dict[key] = policy_net_state_dict[key] * TAU + target_net_state_dict[key]*(1-TAU)
+                target_net_state_dict[key] = policy_net_state_dict[key] * TAU + target_net_state_dict[key] * (1-TAU)
             target_net.load_state_dict(target_net_state_dict)
 
             if done:
                 episode_durations.append(t + 1)
                 plot_durations()
                 break
-
+    
+    torch.save(policy_net.state_dict(), 'model.pth')
+    print('Complete')
     plot_durations(show_result=True)
     plt.ioff()
     plt.show()

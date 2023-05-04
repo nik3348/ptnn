@@ -4,15 +4,16 @@ import torch.nn as nn
 
 
 class PositionalEmbedding(nn.Module):
-    def __init__(self, max_seq_len, embed_size):
+    def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 5000):
         super().__init__()
-        self.pos_enc = torch.zeros(max_seq_len, embed_size)
-
-        for pos in range(max_seq_len):
-            for i in range(0, embed_size, 2):
-                self.pos_enc[pos, i] = math.sin(pos / (10000 ** (i / embed_size)))
-                self.pos_enc[pos, i+1] = math.cos(pos / (10000 ** (i / embed_size)))
+        self.dropout = nn.Dropout(p=dropout)
+        position = torch.arange(max_len).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2) * (-math.log(10000.0) / d_model))
+        pe = torch.zeros(max_len, 1, d_model)
+        pe[:, 0, 0::2] = torch.sin(position * div_term)
+        pe[:, 0, 1::2] = torch.cos(position * div_term)
+        self.register_buffer('pe', pe)
 
     def forward(self, x):
-        x = x.clone().detach()
-        return x + self.pos_enc
+        x = x + self.pe[:x.size(0)]
+        return self.dropout(x)

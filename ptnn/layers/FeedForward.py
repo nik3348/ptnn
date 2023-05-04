@@ -1,15 +1,17 @@
-import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 class FeedForward(nn.Module):
-    def __init__(self, embed_size):
+    def __init__(self, embed_size, dropout=0.1):
         super().__init__()
-        self.l1 = nn.Linear(embed_size, embed_size)
-        self.relu = nn.ReLU()
-        self.l2 = nn.Linear(embed_size, embed_size)
+        self.layers = nn.Sequential(
+            nn.Linear(embed_size, embed_size),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(embed_size, embed_size),
+            nn.Dropout(dropout)
+        )
 
     def forward(self, x):
-        x = self.l1(x)
-        x = self.relu(x)
-        x = self.l2(x)
+        x = self.layers(x)
         return x

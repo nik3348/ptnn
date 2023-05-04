@@ -14,8 +14,8 @@ class Model(nn.Module):
         self.linear = nn.Linear(embed_size, output_size)
 
     def forward(self, x):
-        x = self.cnn.forward(x)
-        x = self.posEmb.forward(x)
-        x = self.encoder.forward(x)
+        x = self.cnn(x)
+        x = self.posEmb(x)
+        x = self.encoder(x)
         logits = self.linear(x)
         return F.softmax(logits, dim=1)

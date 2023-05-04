@@ -1,7 +1,7 @@
-import torch
 import torch.nn as nn
 from ptnn.layers.MultiheadAttention import MultiheadAttention 
 from ptnn.layers.FeedForward import FeedForward 
+
 
 class Encoder(nn.Module):
     def __init__(self, embed_size, heads):

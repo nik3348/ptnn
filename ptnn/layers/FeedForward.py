@@ -3,7 +3,7 @@ import torch.nn as nn
 
 class FeedForward(nn.Module):
     def __init__(self, embed_size):
-        super(FeedForward, self).__init__()
+        super().__init__()
         self.l1 = nn.Linear(embed_size, embed_size)
         self.relu = nn.ReLU()
         self.l2 = nn.Linear(embed_size, embed_size)

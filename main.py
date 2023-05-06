@@ -1,7 +1,6 @@
 import argparse
 import torch
-
-from ptnn.models.DQN import DQN
+from ptnn.models.Test import start
 
 parser = argparse.ArgumentParser(description='PyTorch Example')
 parser.add_argument('--disable-cuda', action='store_true',
@@ -15,5 +14,4 @@ else:
     args.device = torch.device('cpu')
 
 if __name__ == '__main__':
-    dqn = DQN()
-    dqn.train(args)
+    start()

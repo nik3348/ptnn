@@ -7,14 +7,15 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
+from gymnasium.wrappers.human_rendering import HumanRenderingWrapper
 from collections import namedtuple, deque
 from itertools import count
 from matplotlib import pyplot as plt
 
-from ptnn.layers.ConvolutionalNeuralNetwork import ConvolutionalNeuralNetwork
+from ptnn.layers.Convolutional import ConvolutionalNeuralNetwork
 from ptnn.layers.Encoder import Encoder
 from ptnn.layers.PositionalEmbedding import PositionalEmbedding
-from ptnn.env.Wrapper import Wrapper
+from ptnn.wrappers.Wrapper import Wrapper
 
 is_ipython = 'inline' in matplotlib.get_backend()
 if is_ipython:
@@ -53,7 +54,8 @@ class Model(nn.Module):
 
 class DQN():
     def __init__(self):
-        self.env = gym.make("CartPole-v1", render_mode="rgb_array")
+        self.env = gym.make("CartPole-v1", render_mode="human")
+        self.env = HumanRenderingWrapper(self.env)
         self.env = Wrapper(self.env)
         self.env.reset()
 
@@ -72,7 +74,7 @@ class DQN():
         self.EPS_DECAY = 1000
         self.TAU = 0.005
         self.LR = 1e-4
-        self.EMBED_SIZE = 512
+        self.EMBED_SIZE = 16
         self.HEADS = 8
         self.NUM_CLASSES = self.env.action_space.n
 

@@ -1,6 +1,7 @@
 import gymnasium as gym
 import torch
 from torchvision.transforms import Resize
+from torchvision.transforms.functional import crop
 
 class Wrapper(gym.Wrapper):
     def __init__(self, env):
@@ -19,7 +20,8 @@ class Wrapper(gym.Wrapper):
         image_tensor = self.env.render()
         image_tensor = torch.div(torch.from_numpy(image_tensor).unsqueeze(0), 255).float()
 
-        target_size = (32, 32)
+        target_size = (64, 64)
         resize_transform = Resize(target_size)
         resized_tensor = resize_transform(image_tensor.permute(0, 3, 1, 2))
+        
         return resized_tensor

@@ -16,10 +16,10 @@ class Convolutional(nn.Module):
         self.pool2 = nn.MaxPool2d(kernel_size=(2, 2))
         self.flat = nn.Flatten()
 
-        self.fc3 = nn.Linear(8192, 512)
+        self.fc3 = nn.Linear(32768, 512)
         self.act3 = nn.ReLU()
         self.drop3 = nn.Dropout(0.5)
-        self.fc4 = nn.Linear(512, 16)
+        self.fc4 = nn.Linear(512, 32)
 
     def forward(self, x):
         x = self.conv1(x)

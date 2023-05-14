@@ -91,7 +91,11 @@ def start():
             observation = next_state
 
             if len(memory) > 20:
-                batch = random.sample(memory, 20)
+                # batch = random.sample(memory, 20)
+                batch = memory[-10:]
+                if t < 0:
+                    batch = memory[-1:]
+
                 state_batch = torch.cat([b[0] for b in batch], dim=0)
                 action_batch = torch.tensor([b[1] for b in batch], dtype=torch.long)
                 reward_batch = torch.tensor([b[2] for b in batch], dtype=torch.float)

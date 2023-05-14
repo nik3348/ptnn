@@ -1,6 +1,6 @@
 import argparse
 import torch
-from ptnn.models.Test import start
+from ptnn.models.ppo2 import start
 
 parser = argparse.ArgumentParser(description='PyTorch Example')
 parser.add_argument('--disable-cuda', action='store_true',

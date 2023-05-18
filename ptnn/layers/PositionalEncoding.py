@@ -27,7 +27,6 @@ class PositionalEncoding(nn.Module):
         Returns:
             Tensor of shape (batch_size, seq_len, d_model) with added positional encodings
         """
-        # Add the positional encodings to the input tensor
-        concatenated_array = torch.cat((self.pe[1][0], self.pe[0][0]), axis=0)
+        concatenated_array = torch.cat((self.pe[2][0], self.pe[1][0], self.pe[0][0]), axis=0)
         x = x + concatenated_array
         return x

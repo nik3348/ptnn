@@ -19,9 +19,11 @@ if is_ipython:
     from IPython import display
 
 class ActorCritic(nn.Module):
-    def __init__(self, state_size, action_size):
+    def __init__(self, obs_size, max_seq_len, action_size):
         super().__init__()
-        self.pe = PositionalEncoding(4, 3)
+        self.pe = PositionalEncoding(obs_size, max_seq_len)
+
+        state_size = obs_size * max_seq_len
         self.actor = nn.Sequential(
             nn.Linear(state_size, 256),
             nn.Tanh(),
@@ -40,6 +42,7 @@ class ActorCritic(nn.Module):
 
     def forward(self, state):
         state = self.pe(state)
+        state = state.view(state.size(0), -1)
 
         action_probs = self.actor(state)
         value = self.critic(state)
@@ -83,19 +86,18 @@ def ppo2(env_name):
 
     # Set hyperparameters
     num_epochs = 500
-    num_steps = 2048
-    mini_batch_epochs = 5
-    mini_batch_size = 64
+    num_steps = 1024
+    mini_batch_epochs = 10
+    mini_batch_size = 128
     learning_rate = 1e-4
     gamma = 0.99
     clip_param = 0.2
     value_coeff = 0.5
     entropy_coeff = 0.01
+    max_seq_len = 3
 
     # Initialize the model and optimizer
-    state_size = env.observation_space.shape[0] * 3
-    action_size = env.action_space.n
-    model = ActorCritic(state_size, action_size).to(device)
+    model = ActorCritic(env.observation_space.shape[0], max_seq_len, env.action_space.n).to(device)
     model.load_state_dict(torch.load('models/model.pth'))
 
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
@@ -122,12 +124,12 @@ def ppo2(env_name):
 
             next_state, reward, terminated, truncated, _ = env.step(action.item())
             done = terminated or truncated
-            
-            states.append(state)
-            actions.append(action)
+
+            states.append(state.squeeze(dim=0))
+            actions.append(action.squeeze(dim=0))
             rewards.append(reward)
             values.append(value)
-            log_probs.append(log_prob)
+            log_probs.append(log_prob.squeeze(dim=0))
 
             state = next_state
 
@@ -161,7 +163,7 @@ def ppo2(env_name):
                 actions = actions.to(device)
                 old_log_probs = old_log_probs.to(device)
                 returns = returns.to(device)
-                advantages = advantages.unsqueeze(1).to(device)
+                advantages = advantages.to(device)
 
                 new_action_probs, value_pred = model(states)
                 dist = Categorical(logits=new_action_probs)
@@ -189,6 +191,7 @@ def ppo2(env_name):
         writer.add_scalar("Loss/Value", value_loss.item(), epoch)
         writer.add_scalar("Loss/Entropy", entropy_loss.item(), epoch)
         writer.add_scalar("Loss/Total", total_loss.item(), epoch)
+        plot_durations()
 
     torch.save(model.state_dict(), 'models/model.pth')
     writer.close()

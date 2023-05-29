@@ -8,11 +8,8 @@ class Wrapper(gym.Wrapper):
 
     def step(self, action):
         new_state, reward, terminated, truncated, info = self.env.step(action)
-        
-        cur_state = np.array(self.current_state[-8:])
-        concatenated_array = np.concatenate((cur_state, new_state), axis=0)
-        self.current_state = concatenated_array
-        return concatenated_array, reward, terminated, truncated, info
+        self.current_state = np.concatenate((self.current_state[1:], new_state.reshape(1, -1)), axis=0)
+        return self.current_state, reward, terminated, truncated, info
 
     def reset(self):
         state, info = self.env.reset()
@@ -20,7 +17,7 @@ class Wrapper(gym.Wrapper):
         input_array = np.random.randn(8)
         mask_array = np.array([0, 0, 0, 0, 0, 0, 0, 0], dtype=np.float32)
         masked_input_array = np.where(mask_array == 0, -1e9, input_array)
+        masked_input_array = masked_input_array.reshape((2, 4))
 
-        concatenated_array = np.concatenate((masked_input_array, state), axis=0)
-        self.current_state = concatenated_array
-        return concatenated_array, info
+        self.current_state = np.vstack((masked_input_array, state))
+        return self.current_state, info

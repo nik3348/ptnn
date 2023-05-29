@@ -1,8 +1,5 @@
-from itertools import count
+import random
 import gymnasium as gym
-import matplotlib
-from matplotlib import pyplot as plt
-import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -13,10 +10,6 @@ from ptnn.layers.PositionalEncoding import PositionalEncoding
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
-
-is_ipython = 'inline' in matplotlib.get_backend()
-if is_ipython:
-    from IPython import display
 
 class ActorCritic(nn.Module):
     def __init__(self, obs_size, max_seq_len, action_size):
@@ -49,41 +42,8 @@ class ActorCritic(nn.Module):
 
         return action_probs, value
 
-episode_durations = []
-def plot_durations(show_result=False):
-    plt.figure(1)
-    durations_t = torch.tensor(episode_durations, dtype=torch.float)
-    if show_result:
-        plt.title('Result')
-    else:
-        plt.clf()
-        plt.title('Training...')
-
-    plt.xlabel('Episode')
-    plt.ylabel('Duration')
-    plt.plot(durations_t.numpy())
-
-    if len(durations_t) >= 100:
-        means = durations_t.unfold(0, 100, 1).mean(1).view(-1)
-        means = torch.cat((torch.zeros(99), means))
-        plt.plot(means.numpy())
-
-    plt.pause(0.001)  # pause a bit so that plots are updated
-    if is_ipython:
-        if not show_result:
-            display.display(plt.gcf())
-            display.clear_output(wait=True)
-        else:
-            display.display(plt.gcf())
 
 def ppo2(env_name):
-    # Set the device
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    # Create the environment
-    env = gym.make(env_name, render_mode="human")
-    env = Wrapper(env)
-
     # Set hyperparameters
     num_epochs = 500
     num_steps = 1024
@@ -95,9 +55,17 @@ def ppo2(env_name):
     value_coeff = 0.5
     entropy_coeff = 0.01
     max_seq_len = 3
+    exploration_rate = 0.0001
+    noise_std_dev = 0.001
+
+    # Create the environment
+    env = gym.make(env_name, max_episode_steps=num_steps, render_mode="human")
+    env = Wrapper(env, max_seq_len)
 
     # Initialize the model and optimizer
-    model = ActorCritic(env.observation_space.shape[0], max_seq_len, env.action_space.n).to(device)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = ActorCritic(
+        env.observation_space.shape[0], max_seq_len, env.action_space.n).to(device)
     model.load_state_dict(torch.load('models/model.pth'))
 
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
@@ -105,6 +73,7 @@ def ppo2(env_name):
 
     # Training loop
     max_score = 0
+    episode_durations = []
     for epoch in range(num_epochs):
         states = []
         actions = []
@@ -115,15 +84,21 @@ def ppo2(env_name):
         state, _ = env.reset()
         for score in range(num_steps):
             state = torch.FloatTensor(state).unsqueeze(0).to(device)
-            
+
             with torch.no_grad():
                 action_probs, value = model(state)
             dist = Categorical(logits=action_probs)
-            action = dist.sample()
-            log_prob = dist.log_prob(action)
 
-            next_state, reward, terminated, truncated, _ = env.step(action.item())
+            if random.uniform(0, 1) < exploration_rate:
+                action = torch.tensor(
+                    [env.action_space.sample()], dtype=torch.long).to(device)
+            else:
+                action = dist.sample()
+
+            next_state, reward, terminated, truncated, _ = env.step(
+                action.item())
             done = terminated or truncated
+            log_prob = dist.log_prob(action)
 
             states.append(state.squeeze(dim=0))
             actions.append(action.squeeze(dim=0))
@@ -165,20 +140,22 @@ def ppo2(env_name):
                 returns = returns.to(device)
                 advantages = advantages.to(device)
 
+                # Add parameter noise
+                for param in model.parameters():
+                    noise = torch.randn_like(param) * noise_std_dev
+                    param.data.add_(noise)
+
                 new_action_probs, value_pred = model(states)
                 dist = Categorical(logits=new_action_probs)
                 new_log_probs = dist.log_prob(actions)
-                
+
                 ratio = torch.exp(new_log_probs - old_log_probs)
                 surrogate1 = ratio * advantages
                 surrogate2 = torch.clamp(ratio, 1 - clip_param, 1 + clip_param) * advantages
 
                 policy_loss = -torch.min(surrogate1, surrogate2).mean()
-
                 value_loss = F.mse_loss(value_pred.squeeze().float(), returns.float())
-
                 entropy_loss = dist.entropy().mean()
-
                 total_loss = policy_loss + value_coeff * value_loss - entropy_coeff * entropy_loss
 
                 optimizer.zero_grad()
@@ -186,15 +163,16 @@ def ppo2(env_name):
                 optimizer.step()
 
         if epoch > 100:
-            writer.add_scalar("Score/Average", torch.FloatTensor(episode_durations).mean().item(), epoch)
+            writer.add_scalar(
+                "Score/Average", torch.FloatTensor(episode_durations).mean().item(), epoch)
         writer.add_scalar("Loss/Policy", policy_loss.item(), epoch)
         writer.add_scalar("Loss/Value", value_loss.item(), epoch)
         writer.add_scalar("Loss/Entropy", entropy_loss.item(), epoch)
         writer.add_scalar("Loss/Total", total_loss.item(), epoch)
-        plot_durations()
 
     torch.save(model.state_dict(), 'models/model.pth')
     writer.close()
+
 
 def start():
     env_name = "CartPole-v1"

@@ -7,6 +7,7 @@ import torch.optim as optim
 from torch.distributions import Categorical
 from ptnn.wrappers.ppo2Wrapper import Wrapper
 from ptnn.layers.PositionalEncoding import PositionalEncoding
+from ptnn.layers.Encoder import Encoder
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
@@ -18,6 +19,7 @@ class ActorCritic(nn.Module):
 
         state_size = obs_size * max_seq_len
         self.actor = nn.Sequential(
+            Encoder(state_size, 8),
             nn.Linear(state_size, 256),
             nn.Tanh(),
             nn.Linear(256, 128),
@@ -26,6 +28,7 @@ class ActorCritic(nn.Module):
             nn.Softmax(dim=-1)
         )
         self.critic = nn.Sequential(
+            Encoder(state_size, 8),
             nn.Linear(state_size, 256),
             nn.Tanh(),
             nn.Linear(256, 128),
@@ -45,16 +48,16 @@ class ActorCritic(nn.Module):
 
 def ppo2(env_name):
     # Set hyperparameters
-    num_epochs = 500
+    num_epochs = 1000
     num_steps = 1024
-    mini_batch_epochs = 10
+    mini_batch_epochs = 20
     mini_batch_size = 128
     learning_rate = 1e-4
     gamma = 0.99
     clip_param = 0.2
     value_coeff = 0.5
     entropy_coeff = 0.01
-    max_seq_len = 3
+    max_seq_len = 16
     exploration_rate = 0.0001
     noise_std_dev = 0.001
 
@@ -64,8 +67,7 @@ def ppo2(env_name):
 
     # Initialize the model and optimizer
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = ActorCritic(
-        env.observation_space.shape[0], max_seq_len, env.action_space.n).to(device)
+    model = ActorCritic(env.observation_space.shape[0], max_seq_len, env.action_space.n).to(device)
     model.load_state_dict(torch.load('models/model.pth'))
 
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
@@ -90,13 +92,11 @@ def ppo2(env_name):
             dist = Categorical(logits=action_probs)
 
             if random.uniform(0, 1) < exploration_rate:
-                action = torch.tensor(
-                    [env.action_space.sample()], dtype=torch.long).to(device)
+                action = torch.tensor([env.action_space.sample()], dtype=torch.long).to(device)
             else:
                 action = dist.sample()
 
-            next_state, reward, terminated, truncated, _ = env.step(
-                action.item())
+            next_state, reward, terminated, truncated, _ = env.step(action.item())
             done = terminated or truncated
             log_prob = dist.log_prob(action)
 

@@ -14,8 +14,11 @@ class Encoder(nn.Module):
     def forward(self, x):
         residual = x
         x = self.mha(x, x, x)
-        x = self.dropout(residual + self.norm1(x))
+        x = self.norm1(x)
+        x = self.dropout(residual + x)
+
         residual = x
         x = self.ff(x)
-        x = self.dropout(residual + self.norm2(x))
+        x = self.norm2(x)
+        x = self.dropout(residual + x)
         return x

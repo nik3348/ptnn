@@ -1,9 +1,9 @@
-import gymnasium as gym
+import gymnasium
 import torch
 from torchvision.transforms import Resize
 from torchvision.transforms.functional import crop
 
-class Wrapper(gym.Wrapper):
+class Wrapper(gymnasium.Wrapper):
     def __init__(self, env):
         super().__init__(env)
 

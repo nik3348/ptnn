@@ -1,12 +1,12 @@
 import numpy as np
-import gymnasium as gym
+import gymnasium
 
 from gymnasium.spaces import Box
 from ray.rllib.utils.images import resize
 
-class WarpFrame(gym.ObservationWrapper):
+class WarpFrame(gymnasium.ObservationWrapper):
     def __init__(self, env, dim):
-        gym.ObservationWrapper.__init__(self, env)
+        gymnasium.ObservationWrapper.__init__(self, env)
         self.width = dim
         self.height = dim
         self.observation_space = Box(

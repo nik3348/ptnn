@@ -14,7 +14,7 @@ from matplotlib import pyplot as plt
 
 from ptnn.layers.Convolutional import ConvolutionalNeuralNetwork
 from ptnn.layers.Encoder import Encoder
-from ptnn.layers.PositionalEmbedding import PositionalEmbedding
+from ptnn.layers.PositionalEncoding import PositionalEncoding
 from ptnn.wrappers.Wrapper import Wrapper
 
 is_ipython = 'inline' in matplotlib.get_backend()
@@ -41,7 +41,7 @@ class Model(nn.Module):
     def __init__(self, embed_size, heads, output_size):
         super().__init__()
         self.cnn = ConvolutionalNeuralNetwork()
-        self.posEmb = PositionalEmbedding(embed_size)
+        self.posEmb = PositionalEncoding(embed_size)
         self.encoder = Encoder(embed_size, heads)
         self.linear = nn.Linear(embed_size, output_size)
 

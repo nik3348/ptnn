@@ -1,7 +1,8 @@
-from ptnn.models.ppo2 import train, ppo2
+from ptnn.trainers.PPO import train, ppo2
+from ptnn.trainers.DDPG import start
 
 if __name__ == '__main__':
     # train()
-    env_name = "CartPole-v1"
-    ppo2(env_name)
-
+    # env_name = "LunarLander-v2"
+    # ppo2(env_name)
+    start()

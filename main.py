@@ -1,8 +1,9 @@
-from ptnn.trainers.PPO import train, ppo2
+from ptnn.trainers.PPO import PPO
 from ptnn.trainers.DDPG import start
+from ptnn.utils.parallel import run
 
 if __name__ == '__main__':
-    # train()
-    # env_name = "LunarLander-v2"
-    # ppo2(env_name)
-    start()
+    env_name = "LunarLander-v2"
+    # run(env_name, PPO)
+    # PPO(env_name)
+    start(env_name)

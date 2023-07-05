@@ -3,43 +3,38 @@ import gymnasium
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
-from ptnn.wrappers.ppo2Wrapper import Wrapper
-from ptnn.models.MLP import ActorCritic
-from torch.distributions import Categorical
 from torch.utils.data import DataLoader
+from ptnn.models.MLP import ActorCritic
 from torch.utils.tensorboard import SummaryWriter
 
-from supersuit import color_reduction_v0, frame_stack_v1
+from ptnn.utils.logger import reward_metric
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-input_size = 8
-hidden_size = 512
-output = 2
+input_size = 2
+hidden_size = 256
+output = 1
 num_layers = 2
 
+folder = 'checkpoints/ppo'
 model = ActorCritic(input_size, hidden_size, output).to(device)
-# model.load_state_dict(torch.load('models/model.pth'))
+# model.load(folder)
 
-def ppo2(env_name):
+def PPO(env_name):
     # Set hyperparameters
-    num_epochs = 1000
-    num_steps = 5000
+    num_epochs = 200
+    num_steps = 2000
     mini_batch_size = 512
-    gamma = 0.2
+    gamma = 0.99
     max_seq_len = 1
-    exploration_rate = 1e-5
+    exploration_rate = 1e-4
 
     # Create the environment
-    env = gymnasium.make(env_name, render_mode="rgb_array", continuous=True)
-
+    env = gymnasium.make(env_name, render_mode="rgb_array", max_episode_steps=num_steps)
     writer = SummaryWriter()
 
     # Training loop
-    max_score = 0
     episode_durations = []
-    offline = []
-    # foo = torch.load('data/offline.pth')
     for epoch in range(num_epochs):
         states = []
         actions = []
@@ -50,9 +45,8 @@ def ppo2(env_name):
         next_states = []
         dones = []
 
-        save = False
         state, _ = env.reset()
-        for score in range(num_steps):
+        for _ in range(num_steps):
             state = torch.FloatTensor(state).unsqueeze(0).to(device)
 
             with torch.no_grad():
@@ -79,15 +73,9 @@ def ppo2(env_name):
             state = next_state
 
             if done:
-                foo = torch.FloatTensor(rewards).sum()
-                episode_durations.append(foo)
-                writer.add_scalar("Score/Actual", foo, epoch)
-                # if score > max_score:
-                #     max_score = score
-                #     writer.add_scalar("Score/Max", max_score, epoch)
-
-                # if score < num_steps - 1:
-                #     save = True
+                total_reward = torch.FloatTensor(rewards).sum()
+                episode_durations.append(total_reward)
+                writer.add_scalar("Score/Actual", total_reward, epoch)
                 break
 
         # Compute returns and advantages
@@ -107,15 +95,6 @@ def ppo2(env_name):
 
         # Update policy
         dataset = list(zip(states, actions, log_probs, returns, advantages))
-        if save:
-            offline += dataset
-            save = False
-            print('Saving Data')
-
-        if offline:
-            bar = DataLoader(offline, batch_size=mini_batch_size, shuffle=True)
-            policy_loss, value_loss, entropy_loss, total_loss = train(bar)
-
         data_loader = DataLoader(dataset, batch_size=mini_batch_size, shuffle=True)
         policy_loss, value_loss, entropy_loss, total_loss = train(data_loader)
 
@@ -130,29 +109,31 @@ def ppo2(env_name):
         average_norm = sum(norms) / len(norms)
         writer.add_scalar("Gradient/AvgNorm", average_norm, epoch)
 
-        if epoch % 100 == 0:
+        if epoch % 50 == 0 and epoch > 0:
             print('Checkpointing')
-            torch.save(offline, 'data/offline.pth')
-            torch.save(model.state_dict(), 'models/model.pth')
+            model.save(folder)
 
         if epoch > 100:
-            writer.add_scalar(
-                "Score/Average", torch.FloatTensor(episode_durations).mean().item(), epoch)
+            writer.add_scalar("Score/Average", torch.FloatTensor(episode_durations).mean().item(), epoch)
         writer.add_scalar("Loss/Policy", policy_loss.item(), epoch)
         writer.add_scalar("Loss/Value", value_loss.item(), epoch)
         writer.add_scalar("Loss/Entropy", entropy_loss.item(), epoch)
         writer.add_scalar("Loss/Total", total_loss.item(), epoch)
+        reward_metric(epoch, num_epochs, total_reward)
     writer.close()
 
 
-def train(data_loader=None):
-    epochs = 10
-    learning_rate = 1e-4
-    clip_param = 0.2
-    value_coeff = 0.5
-    entropy_coeff = 0.01
-    noise_std_dev = 0.0001
-    max_grad_norm = 2.0
+def train(
+        data_loader=None,
+        epochs=10,
+        learning_rate=1e-4,
+        clip_param=0.2,
+        value_coeff=0.5,
+        entropy_coeff=0.01,
+        noise_std_dev=0.0001,
+        max_grad_norm=2.0,
+    ):
+
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
     if data_loader is None:
@@ -160,7 +141,7 @@ def train(data_loader=None):
         data_loader = DataLoader(torch.load('data/offline.pth'), batch_size=128, shuffle=True)
         print('Training')
 
-    for t in range(epochs):
+    for _ in range(epochs):
         for states, actions, old_log_probs, returns, advantages in data_loader:
             states = states.to(device)
             actions = actions.to(device)
@@ -190,6 +171,6 @@ def train(data_loader=None):
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)
             optimizer.step()
 
-            torch.save(model.state_dict(), 'models/model.pth')
+            model.save(folder)
 
     return policy_loss, value_loss, entropy_loss, total_loss

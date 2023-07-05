@@ -156,7 +156,7 @@ def start():
     env = frame_stack_v1(env, 4)
 
     model = SACAgent(env.observation_space.shape[0], env.action_space.shape[0])
-    model.load('models/sac')
+    model.load('checkpoints/sac')
     data_loader = DataLoader(torch.load('data/offline.pth'), batch_size=128, shuffle=True)
 
     for _ in range(100):
@@ -197,4 +197,4 @@ def start():
             dones = dones.unsqueeze(1).to(device)
             model.update(states, actions, next_states, rewards, dones)
 
-        model.save('models/sac')
+        model.save('checkpoints/sac')

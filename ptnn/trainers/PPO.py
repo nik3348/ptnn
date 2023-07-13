@@ -163,7 +163,7 @@ def train(
 
             policy_loss = -torch.min(surrogate1, surrogate2).mean()
             value_loss = F.mse_loss(value_pred.squeeze().float(), returns.float())
-            entropy_loss = dist.entropy().mean()
+            entropy_loss = -dist.entropy().mean()
             total_loss = policy_loss + value_coeff * value_loss - entropy_coeff * entropy_loss
 
             optimizer.zero_grad()

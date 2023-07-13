@@ -5,8 +5,8 @@ from ptnn.layers.FeedForward import FeedForward
 class Encoder(nn.Module):
     def __init__(self, embed_size, heads, dropout=0.1):
         super(Encoder, self).__init__()
-        self.mha = MultiheadAttention(embed_size, heads)
         self.norm1 = nn.LayerNorm(embed_size)
+        self.mha = MultiheadAttention(embed_size, heads, dropout)
         self.ff = FeedForward(embed_size)
         self.norm2 = nn.LayerNorm(embed_size)
         self.dropout = nn.Dropout(dropout)

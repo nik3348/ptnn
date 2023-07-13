@@ -3,7 +3,7 @@ import torch.nn as nn
 
 
 class Actor(nn.Module):
-    def __init__(self, input_size, hidden_size, num_layers, output_size, dropout=0.0):
+    def __init__(self, input_size, hidden_size, num_layers, output_size, dropout=0.1):
         super(Actor, self).__init__()
         self.hidden_size = hidden_size
         self.num_layers = num_layers
@@ -38,13 +38,16 @@ class Actor(nn.Module):
                 nn.init.xavier_normal_(layer.weight)
                 nn.init.zeros_(layer.bias)
 
-    def forward(self, x):
+    def forward(self, x, seq_lengths):
+        packed_input = nn.utils.rnn.pack_padded_sequence(x, seq_lengths, batch_first=True, enforce_sorted=False)
+
         h0 = nn.Parameter(torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device))
         c0 = nn.Parameter(torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device))
         nn.init.xavier_normal_(h0)
         nn.init.xavier_normal_(c0)
 
-        outputs, _ = self.lstm(x, (h0, c0))
+        packed_output, _ = self.lstm(packed_input, (h0, c0))
+        outputs, _ = nn.utils.rnn.pad_packed_sequence(packed_output, batch_first=True)
         outputs = self.act1(outputs)
         outputs = self.layer_norm(outputs)
         outputs = self.dropout_layer(outputs)
@@ -61,7 +64,7 @@ class Actor(nn.Module):
 
 
 class Critic(nn.Module):
-    def __init__(self, input_size, hidden_size, num_layers, dropout=0.0):
+    def __init__(self, input_size, hidden_size, num_layers, dropout=0.1):
         super(Critic, self).__init__()
         self.hidden_size = hidden_size
         self.num_layers = num_layers
@@ -96,13 +99,16 @@ class Critic(nn.Module):
                 nn.init.xavier_normal_(layer.weight)
                 nn.init.zeros_(layer.bias)
 
-    def forward(self, x):
+    def forward(self, x, seq_lengths):
+        packed_input = nn.utils.rnn.pack_padded_sequence(x, seq_lengths, batch_first=True, enforce_sorted=False)
+
         h0 = nn.Parameter(torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device))
         c0 = nn.Parameter(torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device))
         nn.init.xavier_normal_(h0)
         nn.init.xavier_normal_(c0)
 
-        outputs, _ = self.lstm(x, (h0, c0))
+        packed_output, _ = self.lstm(packed_input, (h0, c0))
+        outputs, _ = nn.utils.rnn.pad_packed_sequence(packed_output, batch_first=True)
         outputs = self.act1(outputs)
         outputs = self.layer_norm(outputs)
         outputs = self.dropout_layer(outputs)
@@ -124,7 +130,7 @@ class ActorCritic(nn.Module):
         self.actor = Actor(input_size, hidden_size, num_layers, action_size)
         self.critic = Critic(input_size, hidden_size, num_layers)
 
-    def forward(self, state):
-        action_probs = self.actor(state)
-        value = self.critic(state)
+    def forward(self, state, seq_lengths):
+        action_probs = self.actor(state, seq_lengths)
+        value = self.critic(state, seq_lengths)
         return action_probs, value

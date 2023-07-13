@@ -128,7 +128,7 @@ class DDPG:
 
 
 def start(env_name):
-    env = gymnasium.make(env_name, render_mode="rgb_array", continuous=True)
+    env = gymnasium.make(env_name, render_mode="human", continuous=True)
     writer = SummaryWriter()
 
     state_dim = env.observation_space.shape[0]

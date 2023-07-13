@@ -4,13 +4,12 @@ import torch.nn.functional as F
 
 
 class MultiheadAttention(nn.Module):
-    def __init__(self, embed_size, heads):
+    def __init__(self, embed_size, heads, dropout=0.1):
         super(MultiheadAttention, self).__init__()
         self.embed_size = embed_size
         self.heads = heads
         self.head_dim = embed_size // heads
-        assert (self.head_dim * heads ==
-                embed_size), "Embed size needs to be div by heads"
+        assert (self.head_dim * heads == embed_size), "Embed size needs to be div by heads"
 
         self.qlinear = nn.Linear(embed_size, embed_size)
         self.klinear = nn.Linear(embed_size, embed_size)
@@ -20,9 +19,9 @@ class MultiheadAttention(nn.Module):
         self.k_ln = nn.LayerNorm(embed_size)
         self.v_ln = nn.LayerNorm(embed_size)
 
-        self.dropout = nn.Dropout(0.1)
-
+        self.att_dropout = nn.Dropout(dropout)
         self.linear = nn.Linear(embed_size, embed_size)
+        self.proj_dropout = nn.Dropout(dropout)
 
     def forward(self, query, keys, values):
         query = self.qlinear(query)
@@ -41,11 +40,11 @@ class MultiheadAttention(nn.Module):
         x /= self.head_dim ** (1/2)
         # Masking optional here
         x = F.softmax(x, dim=-1)
-
-        x = self.dropout(x)
+        x = self.att_dropout(x)
 
         x = torch.matmul(x, values)
         x = x.view(-1, self.embed_size)
         x = self.linear(x)
+        x = self.proj_dropout(x)
 
         return x

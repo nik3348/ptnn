@@ -7,7 +7,6 @@ class FeedForward(nn.Module):
         self.layers = nn.Sequential(
             nn.Linear(embed_size, embed_size),
             nn.ReLU(),
-            nn.Dropout(dropout),
             nn.Linear(embed_size, embed_size),
             nn.Dropout(dropout)
         )
